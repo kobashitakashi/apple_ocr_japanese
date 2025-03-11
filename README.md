@@ -37,6 +37,27 @@ python main.py 画像ファイルが含まれるディレクトリ
 python main.py ~/Desktop/screenshots
 ```
 
+### シェルスクリプトを使用する場合
+
+より簡単に使用するために、シェルスクリプトが用意されています：
+
+```bash
+./run_ocr.sh [オプション]
+```
+
+ヘルプを表示するには：
+
+```bash
+./run_ocr.sh --help
+```
+
+例：
+
+```bash
+./run_ocr.sh --detect-tables --level moderate
+./run_ocr.sh -i ~/Desktop/screenshots --analyze-layout
+```
+
 ### 出力先ディレクトリ
 
 デフォルトでは、処理結果は入力ディレクトリ直下の**日時分秒のフォルダ**に保存されます。例えば：
@@ -113,6 +134,71 @@ python main.py 画像ファイルが含まれるディレクトリ --move-proces
 
 これにより、処理済みの画像と未処理の画像を区別しやすくなります。
 
+### 高度な機能
+
+#### 表の検出と変換
+
+画像内の表を検出し、Markdown形式の表に変換する機能を有効にするには、`--detect-tables`オプションを使用します。
+
+```bash
+python main.py 画像ファイルが含まれるディレクトリ --detect-tables
+```
+
+この機能は以下のような表を検出します：
+
+- 区切り文字（タブ、パイプ、カンマなど）で区切られた表
+- 等間隔のスペースで区切られた表
+- 複数の列を持つ構造化されたテキスト
+
+検出された表は、以下のようなMarkdown形式の表に変換されます：
+
+```markdown
+| 列1 | 列2 | 列3 |
+| --- | --- | --- |
+| データ1 | データ2 | データ3 |
+| データ4 | データ5 | データ6 |
+```
+
+#### レイアウト解析
+
+画像内のテキストレイアウトを解析し、適切なMarkdown形式に変換する機能を有効にするには、`--analyze-layout`オプションを使用します。
+
+```bash
+python main.py 画像ファイルが含まれるディレクトリ --analyze-layout
+```
+
+この機能は以下のようなレイアウト要素を検出します：
+
+- インデントされたテキスト → Markdownの引用ブロック（`>`）に変換
+- 段組みレイアウト → 適切な順序でテキストを再構成
+
+#### 変換レベルの設定
+
+表の検出やレイアウト解析の積極性を調整するには、`--conversion-level`オプションを使用します。
+
+```bash
+python main.py 画像ファイルが含まれるディレクトリ --detect-tables --conversion-level moderate
+```
+
+使用可能なレベル：
+
+- `conservative`（デフォルト）: 確実な場合のみ変換（精度優先）
+- `moderate`: バランスの取れた変換（精度と網羅性のバランス）
+- `aggressive`: 可能性が高い場合も変換（網羅性優先）
+
+例：
+
+```bash
+# 表の検出と変換を有効にし、積極的な変換レベルを設定
+python main.py ~/Desktop/screenshots --detect-tables --conversion-level aggressive
+
+# レイアウト解析を有効にし、バランスの取れた変換レベルを設定
+python main.py ~/Desktop/screenshots --analyze-layout --conversion-level moderate
+
+# 両方の機能を有効にする
+python main.py ~/Desktop/screenshots --detect-tables --analyze-layout
+```
+
 ## サポートされている画像形式
 
 - PNG (.png)
@@ -179,3 +265,4 @@ python main.py 画像ファイルが含まれるディレクトリ --move-proces
 - 日本語と英語のテキスト認識に対応しています
 - 画像の品質によって認識精度が変わる場合があります
 - テキスト整形機能は完璧ではなく、文書の種類によっては手動での調整が必要な場合があります
+- 表の検出とレイアウト解析は実験的な機能であり、すべての表やレイアウトを正確に検出できるわけではありません

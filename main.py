@@ -23,6 +23,13 @@ def main():
     parser.add_argument('--with-headers', action='store_true', help='統合ファイルにファイル名のヘッダーを追加する')
     parser.add_argument('--with-separators', action='store_true', help='統合ファイルにセパレータ（罫線）を追加する')
     parser.add_argument('--move-processed', action='store_true', help='処理済みの画像を_processedフォルダに移動する')
+    
+    # 第3段階の機能のオプション
+    parser.add_argument('--detect-tables', action='store_true', help='表の検出と変換を有効にする')
+    parser.add_argument('--analyze-layout', action='store_true', help='複雑なレイアウト解析を有効にする')
+    parser.add_argument('--conversion-level', choices=['conservative', 'moderate', 'aggressive'], 
+                        default='conservative', help='変換の積極性レベル（デフォルト: conservative）')
+    
     args = parser.parse_args()
     
     # 入力ディレクトリの確認
@@ -77,6 +84,12 @@ def main():
     
     print(f"処理を開始します。画像ファイル数: {len(image_files)}")
     
+    # 拡張機能の状態を表示
+    if args.detect_tables:
+        print(f"表の検出と変換: 有効（変換レベル: {args.conversion_level}）")
+    if args.analyze_layout:
+        print(f"レイアウト解析: 有効（変換レベル: {args.conversion_level}）")
+    
     # 統合モードの場合の準備
     combined_text = ""
     combined_file = None
@@ -104,8 +117,14 @@ source_files: {len(image_files)}
         print(f"\n[{i}/{len(image_files)}] 処理中: {image_file}")
         
         try:
-            # OCR処理（テキスト整形の有無を指定）
-            text = process_image(image_file, not args.raw)
+            # OCR処理（拡張オプションを指定）
+            text = process_image(
+                image_path=image_file,
+                format_text=not args.raw,
+                detect_tables=args.detect_tables,
+                analyze_layout=args.analyze_layout,
+                conversion_level=args.conversion_level
+            )
             
             # 個別ファイルへの保存（統合モードでも個別ファイルは作成する）
             base_name = os.path.splitext(os.path.basename(image_file))[0]

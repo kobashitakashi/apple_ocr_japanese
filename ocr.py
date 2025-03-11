@@ -4,9 +4,22 @@ from Quartz import CIImage
 import os
 import re
 
-def process_image(image_path, format_text=True):
+def process_image(image_path, format_text=True, detect_tables=False, analyze_layout=False, conversion_level='conservative'):
     """
     画像ファイルからテキストを抽出する
+    
+    Parameters:
+    -----------
+    image_path : str
+        画像ファイルのパス
+    format_text : bool
+        テキスト整形を行うかどうか
+    detect_tables : bool
+        表の検出と変換を行うかどうか
+    analyze_layout : bool
+        複雑なレイアウト解析を行うかどうか
+    conversion_level : str
+        変換の積極性レベル ('conservative', 'moderate', 'aggressive')
     """
     print(f"OCR処理開始: {os.path.basename(image_path)}")
     
@@ -37,21 +50,46 @@ def process_image(image_path, format_text=True):
     results = request.results()
     text = ""
     
+    # 位置情報を含むテキスト行のリスト（レイアウト解析用）
+    text_lines_with_position = []
+    
     if results:
         for observation in results:
             candidates = observation.topCandidates_(1)
             if candidates and len(candidates) > 0:
                 candidate = candidates[0]
                 text += candidate.string() + "\n"
+                
+                # レイアウト解析が有効な場合、位置情報を保存
+                if analyze_layout:
+                    # boundingBoxはNSRectで、左下原点の座標系
+                    bounding_box = observation.boundingBox()
+                    text_lines_with_position.append({
+                        'text': candidate.string(),
+                        'x': bounding_box.origin.x,
+                        'y': bounding_box.origin.y,
+                        'width': bounding_box.size.width,
+                        'height': bounding_box.size.height
+                    })
     else:
         print(f"警告: テキストが検出されませんでした: {image_path}")
         text = "テキストが検出されませんでした。"
     
     print(f"OCR処理完了: {os.path.basename(image_path)}")
     
-    # テキストの後処理（改行の最適化）
+    # テキストの後処理
     if format_text:
+        # 基本的なテキスト整形
         formatted_text = format_ocr_text(text)
+        
+        # 表の検出と変換
+        if detect_tables:
+            formatted_text = detect_and_convert_tables(formatted_text, conversion_level)
+        
+        # 複雑なレイアウト解析
+        if analyze_layout and text_lines_with_position:
+            formatted_text = analyze_and_convert_layout(formatted_text, text_lines_with_position, conversion_level)
+        
         # Markdown形式に変換
         return convert_to_markdown(formatted_text)
     else:
@@ -133,13 +171,13 @@ def convert_to_markdown(text):
         
         # 見出しの検出
         heading_line = detect_heading(line, i, lines)
-        if heading_line:
+        if heading_line != line:  # 見出しとして検出された場合
             markdown_lines.append(heading_line)
             continue
         
         # リストの検出
         list_line = detect_list(line)
-        if list_line:
+        if list_line != line:  # リストとして検出された場合
             markdown_lines.append(list_line)
             continue
         
@@ -223,3 +261,308 @@ def detect_emphasis(line):
     line = re.sub(r'＿([^＿]+)＿', r'*\1*', line)
     
     return line
+
+def detect_and_convert_tables(text, conversion_level='conservative'):
+    """
+    テキスト内の表を検出し、Markdown形式の表に変換する
+    
+    Parameters:
+    -----------
+    text : str
+        変換対象のテキスト
+    conversion_level : str
+        変換の積極性レベル ('conservative', 'moderate', 'aggressive')
+    
+    Returns:
+    --------
+    str
+        表が変換されたテキスト
+    """
+    if not text:
+        return text
+    
+    # 行ごとに処理
+    lines = text.splitlines()
+    result_lines = []
+    
+    # 表の検出と変換
+    i = 0
+    while i < len(lines):
+        # 表の候補となる連続した行を検出
+        table_candidate_lines = detect_table_candidate(lines, i, conversion_level)
+        
+        if table_candidate_lines:
+            # 表の候補が見つかった場合、Markdown形式の表に変換
+            table_markdown = convert_to_markdown_table(table_candidate_lines, conversion_level)
+            result_lines.append(table_markdown)
+            i += len(table_candidate_lines)
+        else:
+            # 表の候補でない場合は、そのまま追加
+            result_lines.append(lines[i])
+            i += 1
+    
+    return '\n'.join(result_lines)
+
+def detect_table_candidate(lines, start_index, conversion_level):
+    """
+    表の候補となる連続した行を検出する
+    
+    Parameters:
+    -----------
+    lines : list
+        テキストの行のリスト
+    start_index : int
+        検出を開始する行のインデックス
+    conversion_level : str
+        変換の積極性レベル
+    
+    Returns:
+    --------
+    list or None
+        表の候補となる行のリスト、または表でない場合はNone
+    """
+    if start_index >= len(lines):
+        return None
+    
+    # 最小行数（ヘッダー行 + 区切り行 + データ行）
+    min_table_rows = 3
+    
+    # 表の候補となる行の特徴
+    # 1. 複数の列を持つ（区切り文字やスペースで区切られている）
+    # 2. 各行の列数が一致または近い
+    # 3. 各列の幅が一定または近い
+    
+    # 表の候補となる行を収集
+    candidate_lines = []
+    current_index = start_index
+    
+    # 最初の行が表のヘッダーの可能性があるか確認
+    first_line = lines[current_index].strip()
+    
+    # 表の区切り文字を検出
+    delimiters = ['\t', '|', ',']
+    delimiter = None
+    columns = None
+    
+    # 区切り文字で分割してみる
+    for delim in delimiters:
+        if delim in first_line:
+            columns = first_line.split(delim)
+            if len(columns) >= 2:  # 少なくとも2列以上
+                delimiter = delim
+                break
+    
+    # 区切り文字が見つからない場合、スペースで区切られた列を検出
+    if not delimiter and conversion_level != 'conservative':
+        # スペースが3つ以上連続している部分を区切りとみなす
+        columns = re.split(r'\s{3,}', first_line)
+        if len(columns) >= 2:
+            delimiter = 'space'
+    
+    # 表の候補が見つからない場合
+    if not delimiter or not columns or len(columns) < 2:
+        return None
+    
+    # 列数
+    column_count = len(columns)
+    
+    # 表の候補となる行を収集
+    while current_index < len(lines) and len(candidate_lines) < 20:  # 最大20行まで
+        line = lines[current_index].strip()
+        
+        # 空行または短すぎる行で表が終了
+        if not line or len(line) < 3:
+            break
+        
+        # 区切り文字で分割
+        if delimiter == 'space':
+            cols = re.split(r'\s{3,}', line)
+        else:
+            cols = line.split(delimiter)
+        
+        # 列数が大きく異なる場合は表の終了
+        if len(cols) < column_count - 1 or len(cols) > column_count + 1:
+            break
+        
+        candidate_lines.append(line)
+        current_index += 1
+    
+    # 表の候補が最小行数未満の場合
+    if len(candidate_lines) < min_table_rows and conversion_level == 'conservative':
+        return None
+    
+    # 表の候補が最小行数未満でも、moderateまたはaggressiveモードでは2行以上あれば許容
+    if len(candidate_lines) < 2 and conversion_level in ['moderate', 'aggressive']:
+        return None
+    
+    return candidate_lines
+
+def convert_to_markdown_table(table_lines, conversion_level):
+    """
+    表の候補となる行をMarkdown形式の表に変換する
+    
+    Parameters:
+    -----------
+    table_lines : list
+        表の候補となる行のリスト
+    conversion_level : str
+        変換の積極性レベル
+    
+    Returns:
+    --------
+    str
+        Markdown形式の表
+    """
+    if not table_lines:
+        return ""
+    
+    # 表の区切り文字を検出
+    delimiters = ['\t', '|', ',']
+    delimiter = None
+    
+    # 最初の行で区切り文字を検出
+    first_line = table_lines[0]
+    for delim in delimiters:
+        if delim in first_line:
+            delimiter = delim
+            break
+    
+    # 区切り文字が見つからない場合、スペースで区切られた列を検出
+    if not delimiter:
+        # スペースが3つ以上連続している部分を区切りとみなす
+        delimiter = 'space'
+    
+    # 各行を列に分割
+    table_data = []
+    max_columns = 0
+    
+    for line in table_lines:
+        if delimiter == 'space':
+            columns = re.split(r'\s{3,}', line.strip())
+        else:
+            columns = [col.strip() for col in line.split(delimiter)]
+        
+        # 空の列を削除
+        columns = [col for col in columns if col]
+        
+        if columns:
+            table_data.append(columns)
+            max_columns = max(max_columns, len(columns))
+    
+    # 表データが空の場合
+    if not table_data or max_columns < 2:
+        return '\n'.join(table_lines)
+    
+    # 各行の列数を揃える
+    for i in range(len(table_data)):
+        while len(table_data[i]) < max_columns:
+            table_data[i].append('')
+    
+    # Markdown形式の表を生成
+    markdown_table = []
+    
+    # ヘッダー行
+    header = '| ' + ' | '.join(table_data[0]) + ' |'
+    markdown_table.append(header)
+    
+    # 区切り行
+    separator = '| ' + ' | '.join(['---'] * max_columns) + ' |'
+    markdown_table.append(separator)
+    
+    # データ行
+    for row in table_data[1:]:
+        data_row = '| ' + ' | '.join(row) + ' |'
+        markdown_table.append(data_row)
+    
+    return '\n'.join(markdown_table)
+
+def analyze_and_convert_layout(text, text_lines_with_position, conversion_level='conservative'):
+    """
+    テキストのレイアウトを解析し、適切なMarkdown形式に変換する
+    
+    Parameters:
+    -----------
+    text : str
+        変換対象のテキスト
+    text_lines_with_position : list
+        位置情報を含むテキスト行のリスト
+    conversion_level : str
+        変換の積極性レベル
+    
+    Returns:
+    --------
+    str
+        レイアウトが変換されたテキスト
+    """
+    if not text or not text_lines_with_position:
+        return text
+    
+    # 行ごとに処理
+    lines = text.splitlines()
+    result_lines = []
+    
+    # インデントレベルを検出して引用ブロックに変換
+    result_lines = detect_and_convert_indentation(lines, text_lines_with_position, conversion_level)
+    
+    return '\n'.join(result_lines)
+
+def detect_and_convert_indentation(lines, text_lines_with_position, conversion_level):
+    """
+    インデントレベルを検出して引用ブロックに変換する
+    
+    Parameters:
+    -----------
+    lines : list
+        テキストの行のリスト
+    text_lines_with_position : list
+        位置情報を含むテキスト行のリスト
+    conversion_level : str
+        変換の積極性レベル
+    
+    Returns:
+    --------
+    list
+        変換後の行のリスト
+    """
+    if not lines or not text_lines_with_position:
+        return lines
+    
+    # X座標でソートして、最も左にある行を基準とする
+    sorted_lines = sorted(text_lines_with_position, key=lambda x: x['x'])
+    base_x = sorted_lines[0]['x']
+    
+    # インデントレベルのしきい値（ピクセル単位）
+    indent_threshold = 20
+    
+    # 各行のインデントレベルを計算
+    result_lines = []
+    
+    for i, line in enumerate(lines):
+        if not line.strip():
+            # 空行はそのまま追加
+            result_lines.append(line)
+            continue
+        
+        # 対応する位置情報を探す
+        matching_line = None
+        for pos_line in text_lines_with_position:
+            if pos_line['text'] in line:
+                matching_line = pos_line
+                break
+        
+        if not matching_line:
+            # 位置情報が見つからない場合はそのまま追加
+            result_lines.append(line)
+            continue
+        
+        # インデントレベルを計算
+        indent_level = int((matching_line['x'] - base_x) / indent_threshold)
+        
+        # インデントレベルに応じて引用ブロックに変換
+        if indent_level > 0 and conversion_level != 'conservative':
+            # Markdownの引用ブロック記法を適用
+            result_lines.append('>' * indent_level + ' ' + line)
+        else:
+            result_lines.append(line)
+    
+    return result_lines
