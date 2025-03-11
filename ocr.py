@@ -87,7 +87,7 @@ def format_ocr_text(text):
             continue
             
         # 次の行が存在し、現在の行が短い場合は改行を削除
-        if i < len(lines) - 1 and len(line) < 40:  # 40文字は調整可能
+        if i < len(lines) - 1 and len(line) < 160:  # 160文字未満を短い行とみなす
             current_paragraph.append(line)
         else:
             # 長い行または最後の行は段落として扱う
