@@ -70,10 +70,19 @@ def main():
             combine_filename = args.combine_file
         else:
             now = datetime.datetime.now()
-            combine_filename = now.strftime("%Y%m%d_%H%M%S.txt")
+            combine_filename = now.strftime("%Y%m%d_%H%M%S.md")
         
         combined_file = os.path.join(output_dir, combine_filename)
         print(f"統合モード: すべてのテキストを {combined_file} に保存します")
+        
+        # 統合ファイルのMarkdownメタデータ
+        combined_text = f"""---
+title: OCR結果統合ファイル
+date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+source_files: {len(image_files)}
+---
+
+"""
     
     # 各画像の処理
     for i, image_file in enumerate(image_files, 1):
@@ -85,17 +94,28 @@ def main():
             
             # 個別ファイルへの保存（統合モードでも個別ファイルは作成する）
             base_name = os.path.splitext(os.path.basename(image_file))[0]
-            output_file = os.path.join(output_dir, f"{base_name}.txt")
+            output_file = os.path.join(output_dir, f"{base_name}.md")
+            
+            # Markdownメタデータを追加
+            md_content = f"""---
+title: {base_name}
+date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+source: {image_file}
+---
+
+{text}
+"""
             
             with open(output_file, 'w', encoding='utf-8') as f:
-                f.write(text)
+                f.write(md_content)
             
             print(f"保存完了: {output_file}")
             
             # 統合モードの場合、テキストを蓄積
             if args.combine:
                 # 空行を追加
-                combined_text += "\n\n"
+                if i > 1:  # 最初のファイルの前には空行を追加しない
+                    combined_text += "\n\n"
                 
                 # ファイル名のヘッダーを追加（オプション）
                 if args.with_headers:
@@ -104,9 +124,9 @@ def main():
                 # テキストを追加
                 combined_text += text
                 
-                # セパレータを追加（オプション）
-                if args.with_separators:
-                    combined_text += "\n\n" + "-" * 80 + "\n"
+                # セパレータを追加（オプション）- Markdown形式の水平線
+                if args.with_separators and i < len(image_files):  # 最後のファイルの後にはセパレータを追加しない
+                    combined_text += "\n\n---\n"
             
             # 処理済み画像の移動
             if args.move_processed:

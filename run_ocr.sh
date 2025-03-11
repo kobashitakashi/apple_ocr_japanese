@@ -51,7 +51,7 @@ fi
 
 # OCR処理を実行
 echo "OCR処理を開始します..."
-python main.py "$INPUT_DIR" --combine --move-processed
+python main.py "$INPUT_DIR" --combine --move-processed --with-headers
 
 # 処理結果の表示
 if [ $? -eq 0 ]; then
