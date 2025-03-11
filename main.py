@@ -6,7 +6,7 @@ import os
 import time
 import shutil
 import datetime
-from ocr import process_image
+from ocr.core import process_image  # インポート文を修正
 from utils import get_image_files
 
 def main():
