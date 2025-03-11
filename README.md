@@ -37,7 +37,9 @@ python main.py 画像ファイルが含まれるディレクトリ
 python main.py ~/Desktop/screenshots
 ```
 
-### 出力先ディレクトリを指定する場合
+### 出力先ディレクトリ
+
+デフォルトでは、テキストファイルは入力ディレクトリ直下の`_output_texts`フォルダに保存されます。別の場所に保存したい場合は、`--output_dir`オプションを使用します。
 
 ```bash
 python main.py 画像ファイルが含まれるディレクトリ --output_dir 出力先ディレクトリ
@@ -71,20 +73,34 @@ python main.py ~/Desktop/screenshots --raw
 python main.py 画像ファイルが含まれるディレクトリ --combine
 ```
 
-統合ファイルの名前を指定する場合は、`--combine_file`オプションを使用します。
+デフォルトでは、統合ファイルの名前は現在の日時（例：`20250311_134940.txt`）になります。別の名前を指定する場合は、`--combine_file`オプションを使用します。
 
 ```bash
 python main.py 画像ファイルが含まれるディレクトリ --combine --combine_file まとめ.txt
 ```
 
-例：
+#### 統合ファイルのフォーマットオプション
+
+デフォルトでは、統合ファイルにはテキストのみが含まれます。ファイル名のヘッダーやセパレータ（罫線）を追加したい場合は、以下のオプションを使用します。
+
+- `--with-headers`: 各テキストの前にファイル名のヘッダー（`# ファイル名`）を追加
+- `--with-separators`: 各テキストの後にセパレータ（罫線）を追加
 
 ```bash
-python main.py ~/Desktop/screenshots --combine
-python main.py ~/Desktop/screenshots --combine --combine_file document.txt
+python main.py ~/Desktop/screenshots --combine --with-headers --with-separators
 ```
 
 注：統合モードでも、各画像ごとの個別テキストファイルは生成されます。
+
+### 処理済み画像の移動
+
+処理が完了した画像を入力ディレクトリ直下の`_processed`フォルダに移動したい場合は、`--move-processed`オプションを使用します。
+
+```bash
+python main.py 画像ファイルが含まれるディレクトリ --move-processed
+```
+
+これにより、処理済みの画像と未処理の画像を区別しやすくなります。
 
 ## サポートされている画像形式
 

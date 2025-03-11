@@ -4,6 +4,8 @@
 import argparse
 import os
 import time
+import shutil
+import datetime
 from ocr import process_image
 from utils import get_image_files
 
@@ -14,10 +16,13 @@ def main():
     # コマンドライン引数の設定
     parser = argparse.ArgumentParser(description='AppleのVisionフレームワークを使ったOCR')
     parser.add_argument('input_dir', help='画像ファイルが含まれるディレクトリ')
-    parser.add_argument('--output_dir', help='テキストファイルの出力先ディレクトリ')
+    parser.add_argument('--output_dir', help='テキストファイルの出力先ディレクトリ（指定しない場合は入力ディレクトリ直下の_output_texts）')
     parser.add_argument('--raw', action='store_true', help='OCR結果をそのまま出力（テキスト整形を行わない）')
     parser.add_argument('--combine', action='store_true', help='すべての画像のOCR結果を1つのファイルに統合する')
-    parser.add_argument('--combine_file', default='combined.txt', help='統合ファイルの名前（デフォルト: combined.txt）')
+    parser.add_argument('--combine_file', help='統合ファイルの名前（指定しない場合は日時分秒）')
+    parser.add_argument('--with-headers', action='store_true', help='統合ファイルにファイル名のヘッダーを追加する')
+    parser.add_argument('--with-separators', action='store_true', help='統合ファイルにセパレータ（罫線）を追加する')
+    parser.add_argument('--move-processed', action='store_true', help='処理済みの画像を_processedフォルダに移動する')
     args = parser.parse_args()
     
     # 入力ディレクトリの確認
@@ -33,12 +38,23 @@ def main():
         return 0
     
     # 出力ディレクトリの設定
-    output_dir = args.output_dir if args.output_dir else args.input_dir
+    if args.output_dir:
+        output_dir = args.output_dir
+    else:
+        # デフォルトは入力ディレクトリ直下の_output_texts
+        output_dir = os.path.join(args.input_dir, "_output_texts")
     
     # 出力ディレクトリが存在しない場合は作成
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         print(f"出力ディレクトリを作成しました: {output_dir}")
+    
+    # 処理済み画像の移動先ディレクトリ
+    if args.move_processed:
+        processed_dir = os.path.join(args.input_dir, "_processed")
+        if not os.path.exists(processed_dir):
+            os.makedirs(processed_dir)
+            print(f"処理済み画像ディレクトリを作成しました: {processed_dir}")
     
     # 処理開始時間
     start_time = time.time()
@@ -49,7 +65,14 @@ def main():
     combined_text = ""
     combined_file = None
     if args.combine:
-        combined_file = os.path.join(output_dir, args.combine_file)
+        # 統合ファイル名の設定（指定がない場合は日時分秒）
+        if args.combine_file:
+            combine_filename = args.combine_file
+        else:
+            now = datetime.datetime.now()
+            combine_filename = now.strftime("%Y%m%d_%H%M%S.txt")
+        
+        combined_file = os.path.join(output_dir, combine_filename)
         print(f"統合モード: すべてのテキストを {combined_file} に保存します")
     
     # 各画像の処理
@@ -71,10 +94,28 @@ def main():
             
             # 統合モードの場合、テキストを蓄積
             if args.combine:
-                # ファイル名をヘッダーとして追加
-                combined_text += f"\n\n# {base_name}\n\n"
+                # 空行を追加
+                combined_text += "\n\n"
+                
+                # ファイル名のヘッダーを追加（オプション）
+                if args.with_headers:
+                    combined_text += f"# {base_name}\n\n"
+                
+                # テキストを追加
                 combined_text += text
-                combined_text += "\n\n" + "-" * 80 + "\n\n"  # セパレータ
+                
+                # セパレータを追加（オプション）
+                if args.with_separators:
+                    combined_text += "\n\n" + "-" * 80 + "\n"
+            
+            # 処理済み画像の移動
+            if args.move_processed:
+                try:
+                    dest_file = os.path.join(processed_dir, os.path.basename(image_file))
+                    shutil.move(image_file, dest_file)
+                    print(f"画像を移動しました: {dest_file}")
+                except Exception as e:
+                    print(f"警告: 画像の移動中にエラーが発生しました: {str(e)}")
             
         except Exception as e:
             print(f"エラー: 処理中に例外が発生しました: {str(e)}")

@@ -49,22 +49,15 @@ if [ ! -d "$INPUT_DIR" ]; then
     exit 1
 fi
 
-# 出力ディレクトリの確認
-OUTPUT_DIR="output_texts"
-if [ ! -d "$OUTPUT_DIR" ]; then
-    echo "出力ディレクトリ '$OUTPUT_DIR' が見つかりません。作成します..."
-    mkdir -p "$OUTPUT_DIR"
-fi
-
 # OCR処理を実行
 echo "OCR処理を開始します..."
-python main.py "$INPUT_DIR" --output_dir "$OUTPUT_DIR" --combine --combine_file "combined.txt"
+python main.py "$INPUT_DIR" --combine --move-processed
 
 # 処理結果の表示
 if [ $? -eq 0 ]; then
     echo "OCR処理が完了しました。"
-    echo "結果は '$OUTPUT_DIR' ディレクトリに保存されました。"
-    echo "統合ファイル: '$OUTPUT_DIR/combined.txt'"
+    echo "結果は '$INPUT_DIR/_output_texts' ディレクトリに保存されました。"
+    echo "処理済みの画像は '$INPUT_DIR/_processed' ディレクトリに移動されました。"
 else
     echo "OCR処理中にエラーが発生しました。"
 fi
