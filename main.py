@@ -6,8 +6,42 @@ import os
 import time
 import shutil
 import datetime
-from ocr.core import process_image  # インポート文を修正
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from ocr.core import process_image
 from utils import get_image_files
+
+def process_single_image(args_dict):
+    """
+    単一の画像を処理する関数（並列処理用）
+    
+    Parameters:
+    -----------
+    args_dict : dict
+        処理に必要なパラメータを含む辞書
+    
+    Returns:
+    --------
+    tuple
+        (index, image_file, text) のタプル
+    """
+    index = args_dict['index']
+    image_file = args_dict['image_path']
+    print(f"処理中: {os.path.basename(image_file)}")
+    
+    try:
+        # OCR処理
+        text = process_image(
+            image_path=image_file,
+            format_text=args_dict['format_text'],
+            detect_tables=args_dict['detect_tables'],
+            analyze_layout=args_dict['analyze_layout'],
+            conversion_level=args_dict['conversion_level']
+        )
+        return (index, image_file, text)
+    except Exception as e:
+        print(f"エラー: 画像 {os.path.basename(image_file)} の処理中に例外が発生しました: {str(e)}")
+        return (index, image_file, None)
 
 def main():
     """
@@ -29,6 +63,10 @@ def main():
     parser.add_argument('--analyze-layout', action='store_true', help='複雑なレイアウト解析を有効にする')
     parser.add_argument('--conversion-level', choices=['conservative', 'moderate', 'aggressive'], 
                         default='conservative', help='変換の積極性レベル（デフォルト: conservative）')
+    
+    # 並列処理のオプション
+    parser.add_argument('--workers', type=int, default=0, 
+                        help='並列処理に使用するワーカー数（デフォルト: CPUコア数）')
     
     args = parser.parse_args()
     
@@ -90,6 +128,10 @@ def main():
     if args.analyze_layout:
         print(f"レイアウト解析: 有効（変換レベル: {args.conversion_level}）")
     
+    # 並列処理のワーカー数を設定
+    num_workers = args.workers if args.workers > 0 else multiprocessing.cpu_count()
+    print(f"並列処理: 有効（ワーカー数: {num_workers}）")
+    
     # 統合モードの場合の準備
     combined_text = ""
     combined_file = None
@@ -112,21 +154,44 @@ source_files: {len(image_files)}
 
 """
     
-    # 各画像の処理
-    for i, image_file in enumerate(image_files, 1):
-        print(f"\n[{i}/{len(image_files)}] 処理中: {image_file}")
+    # 処理パラメータの準備
+    process_args = {
+        'format_text': not args.raw,
+        'detect_tables': args.detect_tables,
+        'analyze_layout': args.analyze_layout,
+        'conversion_level': args.conversion_level
+    }
+    
+    # 並列処理の実行
+    results = []
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        # 各画像ファイルに対して処理を実行（インデックスを付与）
+        futures = []
+        for i, image_file in enumerate(image_files):
+            args_dict = process_args.copy()
+            args_dict['image_path'] = image_file
+            args_dict['index'] = i  # 元の順序を保持するためのインデックス
+            futures.append(executor.submit(process_single_image, args_dict))
         
+        # 結果の収集
+        for i, future in enumerate(as_completed(futures), 1):
+            try:
+                index, image_file, text = future.result()
+                if text is not None:
+                    results.append((index, image_file, text))
+                    print(f"[{i}/{len(image_files)}] 処理完了: {os.path.basename(image_file)}")
+                else:
+                    print(f"[{i}/{len(image_files)}] 処理失敗: {os.path.basename(image_file)}")
+            except Exception as e:
+                print(f"エラー: 処理結果の取得中に例外が発生しました: {str(e)}")
+    
+    # 結果を元の順序でソート
+    results.sort(key=lambda x: x[0])
+    
+    # 個別ファイルの保存
+    for _, image_file, text in results:
         try:
-            # OCR処理（拡張オプションを指定）
-            text = process_image(
-                image_path=image_file,
-                format_text=not args.raw,
-                detect_tables=args.detect_tables,
-                analyze_layout=args.analyze_layout,
-                conversion_level=args.conversion_level
-            )
-            
-            # 個別ファイルへの保存（統合モードでも個別ファイルは作成する）
+            # 個別ファイルへの保存
             base_name = os.path.splitext(os.path.basename(image_file))[0]
             output_file = os.path.join(output_dir, f"{base_name}.md")
             
@@ -145,23 +210,6 @@ source: {image_file}
             
             print(f"保存完了: {output_file}")
             
-            # 統合モードの場合、テキストを蓄積
-            if args.combine:
-                # 空行を追加
-                if i > 1:  # 最初のファイルの前には空行を追加しない
-                    combined_text += "\n\n"
-                
-                # ファイル名のヘッダーを追加（オプション）
-                if args.with_headers:
-                    combined_text += f"# {base_name}\n\n"
-                
-                # テキストを追加
-                combined_text += text
-                
-                # セパレータを追加（オプション）- Markdown形式の水平線
-                if args.with_separators and i < len(image_files):  # 最後のファイルの後にはセパレータを追加しない
-                    combined_text += "\n\n---\n"
-            
             # 処理済み画像の移動
             if args.move_processed and processed_dir:
                 try:
@@ -172,16 +220,34 @@ source: {image_file}
                     print(f"警告: 画像の移動中にエラーが発生しました: {str(e)}")
             
         except Exception as e:
-            print(f"エラー: 処理中に例外が発生しました: {str(e)}")
+            print(f"エラー: ファイル保存中に例外が発生しました: {str(e)}")
     
-    # 統合モードの場合、すべてのテキストを1つのファイルに保存
-    if args.combine and combined_text:
-        try:
-            with open(combined_file, 'w', encoding='utf-8') as f:
-                f.write(combined_text)
-            print(f"\n統合ファイルを保存しました: {combined_file}")
-        except Exception as e:
-            print(f"エラー: 統合ファイルの保存中に例外が発生しました: {str(e)}")
+    # 統合モードの場合、元の順序でテキストを統合
+    if args.combine:
+        for i, (_, image_file, text) in enumerate(results):
+            base_name = os.path.splitext(os.path.basename(image_file))[0]
+            
+            # ファイル名のヘッダーを追加（オプション）
+            if args.with_headers:
+                combined_text += f"# {base_name}\n\n"
+            
+            # テキストを追加
+            combined_text += text
+            
+            # セパレータを追加（オプション）- Markdown形式の水平線
+            if args.with_separators and i < len(results) - 1:  # 最後のファイルの後にはセパレータを追加しない
+                combined_text += "\n\n---\n\n"
+            else:
+                combined_text += "\n\n"
+        
+        # 統合ファイルを保存
+        if combined_text:
+            try:
+                with open(combined_file, 'w', encoding='utf-8') as f:
+                    f.write(combined_text)
+                print(f"\n統合ファイルを保存しました: {combined_file}")
+            except Exception as e:
+                print(f"エラー: 統合ファイルの保存中に例外が発生しました: {str(e)}")
     
     # 処理終了時間
     end_time = time.time()
@@ -189,7 +255,7 @@ source: {image_file}
     
     print(f"\n処理が完了しました。")
     print(f"処理時間: {elapsed_time:.2f}秒")
-    print(f"処理ファイル数: {len(image_files)}")
+    print(f"処理ファイル数: {len(results)}/{len(image_files)}")
     print(f"結果は '{timestamp_dir}' ディレクトリに保存されました。")
     
     return 0

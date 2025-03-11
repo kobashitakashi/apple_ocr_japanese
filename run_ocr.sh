@@ -10,6 +10,7 @@ WITH_HEADERS=false
 DETECT_TABLES=true
 ANALYZE_LAYOUT=true
 CONVERSION_LEVEL="moderate"
+WORKERS=0  # 0はCPUコア数を自動検出
 SHOW_HELP=false
 
 # ヘルプメッセージ
@@ -25,10 +26,12 @@ function show_help {
     echo "  --detect-tables            表の検出と変換を有効にする"
     echo "  --analyze-layout           レイアウト解析を有効にする"
     echo "  --level <レベル>            変換の積極性レベル（conservative, moderate, aggressive）"
+    echo "  -w, --workers <数>          並列処理に使用するワーカー数（デフォルト: CPUコア数）"
     echo ""
     echo "例:"
     echo "  $0 --detect-tables --level moderate"
     echo "  $0 -i ~/Desktop/screenshots --analyze-layout"
+    echo "  $0 --workers 4             # 4つのプロセスで並列処理"
     exit 0
 }
 
@@ -65,6 +68,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --level)
             CONVERSION_LEVEL="$2"
+            shift 2
+            ;;
+        -w|--workers)
+            WORKERS="$2"
             shift 2
             ;;
         *)
@@ -151,6 +158,10 @@ fi
 
 if [ "$CONVERSION_LEVEL" != "conservative" ]; then
     CMD="$CMD --conversion-level $CONVERSION_LEVEL"
+fi
+
+if [ "$WORKERS" -gt 0 ]; then
+    CMD="$CMD --workers $WORKERS"
 fi
 
 # OCR処理を実行
