@@ -37,4 +37,5 @@ var/
 ._*
 
 # プロジェクト特有
+input_images/
 output_texts/
