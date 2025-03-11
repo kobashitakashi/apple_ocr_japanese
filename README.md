@@ -136,33 +136,6 @@ python main.py 画像ファイルが含まれるディレクトリ --move-proces
 
 ### 高度な機能
 
-#### 並列処理
-
-複数の画像を同時に処理することで、処理時間を大幅に短縮できます。デフォルトでは、利用可能なCPUコア数に基づいて並列処理が行われます。
-
-ワーカー数を指定するには、`--workers`オプションを使用します：
-
-```bash
-python main.py 画像ファイルが含まれるディレクトリ --workers 4
-```
-
-シェルスクリプトを使用する場合：
-
-```bash
-./run_ocr.sh -w 4
-```
-
-または
-
-```bash
-./run_ocr.sh --workers 4
-```
-
-注：
-- ワーカー数を増やすとメモリ使用量も増加します
-- 最適なワーカー数はCPUコア数と利用可能なメモリに依存します
-- 大量の画像を処理する場合は特に効果的です
-
 #### 表の検出と変換
 
 画像内の表を検出し、Markdown形式の表に変換する機能を有効にするには、`--detect-tables`オプションを使用します。
@@ -226,24 +199,6 @@ python main.py ~/Desktop/screenshots --analyze-layout --conversion-level moderat
 python main.py ~/Desktop/screenshots --detect-tables --analyze-layout
 ```
 
-#### 複数の機能を組み合わせる
-
-これらの機能は自由に組み合わせることができます：
-
-```bash
-# 並列処理と表の検出を組み合わせる
-python main.py ~/Desktop/screenshots --detect-tables --workers 4
-
-# すべての高度な機能を有効にする
-python main.py ~/Desktop/screenshots --detect-tables --analyze-layout --conversion-level moderate --workers 8 --combine --with-headers
-```
-
-シェルスクリプトを使用する場合：
-
-```bash
-./run_ocr.sh --detect-tables --analyze-layout --level moderate -w 4
-```
-
 ## サポートされている画像形式
 
 - PNG (.png)
@@ -304,16 +259,6 @@ python main.py ~/Desktop/screenshots --detect-tables --analyze-layout --conversi
 
 これにより、スキャンした文書から抽出したテキストが読みやすくなります。
 
-## パフォーマンスについて
-
-このツールは、以下の方法でパフォーマンスを最適化しています：
-
-- **並列処理**: 複数のCPUコアを活用して、複数の画像を同時に処理
-- **効率的なメモリ管理**: 処理中のメモリ使用量を最適化
-- **バッチ処理**: 大量の画像を効率的に処理
-
-特に大量の画像を処理する場合、並列処理によって処理時間を大幅に短縮できます。
-
 ## 注意事項
 
 - このツールはmacOSでのみ動作します（AppleのVisionフレームワークに依存しているため）
@@ -321,4 +266,31 @@ python main.py ~/Desktop/screenshots --detect-tables --analyze-layout --conversi
 - 画像の品質によって認識精度が変わる場合があります
 - テキスト整形機能は完璧ではなく、文書の種類によっては手動での調整が必要な場合があります
 - 表の検出とレイアウト解析は実験的な機能であり、すべての表やレイアウトを正確に検出できるわけではありません
-- 並列処理を使用する場合、システムリソース（CPU、メモリ）の使用量が増加します
+
+## ライセンスと免責事項
+
+### ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。
+
+簡潔に言えば：
+- このソフトウェアは自由に使用、修正、配布することができます
+- 商用利用も可能です
+- 著作権表示とライセンス表示を保持してください
+- 作者は一切の保証を提供しません
+
+### 依存関係
+
+このプロジェクトは以下のライブラリに依存しています：
+- [PyObjC](https://github.com/ronaldoussoren/pyobjc)（MITライセンス）
+  - pyobjc-core
+  - pyobjc-framework-Vision
+  - pyobjc-framework-Quartz
+
+### 免責事項
+
+- このツールはAppleのVisionフレームワークを使用しており、**macOSでのみ動作**します
+- OCR処理の精度は画像の品質や内容に依存します
+- このツールの使用によって生じたいかなる損害や問題に対しても、開発者は責任を負いません
+- AppleのAPIやフレームワークの変更により、将来的に動作しなくなる可能性があります
+- このツールはAppleの商標（Apple、Vision、macOSなど）を使用していますが、これらはAppleのAPIを使用していることを示すためだけに使用されています。このプロジェクトはAppleによって承認、スポンサー、または提携されているものではありません
