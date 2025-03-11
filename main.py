@@ -16,7 +16,7 @@ def main():
     # コマンドライン引数の設定
     parser = argparse.ArgumentParser(description='AppleのVisionフレームワークを使ったOCR')
     parser.add_argument('input_dir', help='画像ファイルが含まれるディレクトリ')
-    parser.add_argument('--output_dir', help='テキストファイルの出力先ディレクトリ（指定しない場合は入力ディレクトリ直下の_output_texts）')
+    parser.add_argument('--output_dir', help='テキストファイルの出力先ディレクトリ（指定しない場合は入力ディレクトリ直下の日時フォルダ）')
     parser.add_argument('--raw', action='store_true', help='OCR結果をそのまま出力（テキスト整形を行わない）')
     parser.add_argument('--combine', action='store_true', help='すべての画像のOCR結果を1つのファイルに統合する')
     parser.add_argument('--combine_file', help='統合ファイルの名前（指定しない場合は日時分秒）')
@@ -37,21 +37,37 @@ def main():
         print(f"警告: 指定されたディレクトリに画像ファイルが見つかりませんでした: {args.input_dir}")
         return 0
     
+    # 現在の日時を取得（フォルダ名とファイル名に使用）
+    now = datetime.datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    
     # 出力ディレクトリの設定
     if args.output_dir:
-        output_dir = args.output_dir
+        # ユーザー指定の出力ディレクトリを使用
+        base_output_dir = args.output_dir
+        timestamp_dir = base_output_dir  # タイムスタンプディレクトリは作成しない
     else:
-        # デフォルトは入力ディレクトリ直下の_output_texts
-        output_dir = os.path.join(args.input_dir, "_output_texts")
+        # デフォルトは入力ディレクトリ直下の日時フォルダ
+        base_output_dir = os.path.join(args.input_dir, timestamp)
+        timestamp_dir = base_output_dir
+        
+        # タイムスタンプディレクトリが存在しない場合は作成
+        if not os.path.exists(timestamp_dir):
+            os.makedirs(timestamp_dir)
+            print(f"タイムスタンプディレクトリを作成しました: {timestamp_dir}")
     
-    # 出力ディレクトリが存在しない場合は作成
+    # 出力テキストディレクトリの設定
+    output_dir = os.path.join(timestamp_dir, "_output_texts")
+    
+    # 出力テキストディレクトリが存在しない場合は作成
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-        print(f"出力ディレクトリを作成しました: {output_dir}")
+        print(f"出力テキストディレクトリを作成しました: {output_dir}")
     
     # 処理済み画像の移動先ディレクトリ
+    processed_dir = None
     if args.move_processed:
-        processed_dir = os.path.join(args.input_dir, "_processed")
+        processed_dir = os.path.join(timestamp_dir, "_processed")
         if not os.path.exists(processed_dir):
             os.makedirs(processed_dir)
             print(f"処理済み画像ディレクトリを作成しました: {processed_dir}")
@@ -69,8 +85,7 @@ def main():
         if args.combine_file:
             combine_filename = args.combine_file
         else:
-            now = datetime.datetime.now()
-            combine_filename = now.strftime("%Y%m%d_%H%M%S.md")
+            combine_filename = f"{timestamp}.md"
         
         combined_file = os.path.join(output_dir, combine_filename)
         print(f"統合モード: すべてのテキストを {combined_file} に保存します")
@@ -78,7 +93,7 @@ def main():
         # 統合ファイルのMarkdownメタデータ
         combined_text = f"""---
 title: OCR結果統合ファイル
-date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+date: {now.strftime("%Y-%m-%d %H:%M:%S")}
 source_files: {len(image_files)}
 ---
 
@@ -99,7 +114,7 @@ source_files: {len(image_files)}
             # Markdownメタデータを追加
             md_content = f"""---
 title: {base_name}
-date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+date: {now.strftime("%Y-%m-%d %H:%M:%S")}
 source: {image_file}
 ---
 
@@ -129,7 +144,7 @@ source: {image_file}
                     combined_text += "\n\n---\n"
             
             # 処理済み画像の移動
-            if args.move_processed:
+            if args.move_processed and processed_dir:
                 try:
                     dest_file = os.path.join(processed_dir, os.path.basename(image_file))
                     shutil.move(image_file, dest_file)
@@ -156,6 +171,7 @@ source: {image_file}
     print(f"\n処理が完了しました。")
     print(f"処理時間: {elapsed_time:.2f}秒")
     print(f"処理ファイル数: {len(image_files)}")
+    print(f"結果は '{timestamp_dir}' ディレクトリに保存されました。")
     
     return 0
 

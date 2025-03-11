@@ -51,13 +51,13 @@ fi
 
 # OCR処理を実行
 echo "OCR処理を開始します..."
-python main.py "$INPUT_DIR" --combine --move-processed --with-headers
+python main.py "$INPUT_DIR" --combine --move-processed
 
 # 処理結果の表示
 if [ $? -eq 0 ]; then
     echo "OCR処理が完了しました。"
-    echo "結果は '$INPUT_DIR/_output_texts' ディレクトリに保存されました。"
-    echo "処理済みの画像は '$INPUT_DIR/_processed' ディレクトリに移動されました。"
+    echo "結果は日時分秒のフォルダに保存されました。"
+    echo "フォルダ内に _output_texts と _processed ディレクトリが作成されています。"
 else
     echo "OCR処理中にエラーが発生しました。"
 fi

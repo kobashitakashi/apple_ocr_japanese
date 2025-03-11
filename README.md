@@ -39,7 +39,16 @@ python main.py ~/Desktop/screenshots
 
 ### 出力先ディレクトリ
 
-デフォルトでは、テキストファイルは入力ディレクトリ直下の`_output_texts`フォルダに保存されます。別の場所に保存したい場合は、`--output_dir`オプションを使用します。
+デフォルトでは、処理結果は入力ディレクトリ直下の**日時分秒のフォルダ**に保存されます。例えば：
+
+```
+input_images/
+└── 20250311_140750/
+    ├── _output_texts/  # テキストファイルの保存先
+    └── _processed/     # 処理済み画像の移動先
+```
+
+別の場所に保存したい場合は、`--output_dir`オプションを使用します。
 
 ```bash
 python main.py 画像ファイルが含まれるディレクトリ --output_dir 出力先ディレクトリ
@@ -50,6 +59,8 @@ python main.py 画像ファイルが含まれるディレクトリ --output_dir 
 ```bash
 python main.py ~/Desktop/screenshots --output_dir ~/Desktop/extracted_text
 ```
+
+この場合、日時分秒のフォルダは作成されず、指定したディレクトリに直接保存されます。
 
 ### テキスト整形機能を無効にする場合
 
