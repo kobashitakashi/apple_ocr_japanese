@@ -44,20 +44,20 @@ python main.py ~/Desktop/screenshots
 より簡単に使用するために、シェルスクリプトが用意されています：
 
 ```bash
-./run_ocr.sh [オプション]
+./run.sh [オプション]
 ```
 
 ヘルプを表示するには：
 
 ```bash
-./run_ocr.sh --help
+./run.sh --help
 ```
 
 例：
 
 ```bash
-./run_ocr.sh --detect-tables --level moderate
-./run_ocr.sh -i ~/Desktop/screenshots --analyze-layout
+./run.sh --detect-tables --level moderate
+./run.sh -i ~/Desktop/screenshots --analyze-layout
 ```
 
 ### 出力先ディレクトリ
@@ -151,13 +151,13 @@ python main.py 画像ファイルが含まれるディレクトリ --workers 4
 シェルスクリプトを使用する場合：
 
 ```bash
-./run_ocr.sh -w 4
+./run.sh -w 4
 ```
 
 または
 
 ```bash
-./run_ocr.sh --workers 4
+./run.sh --workers 4
 ```
 
 #### 表の検出と変換
