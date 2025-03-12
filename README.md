@@ -8,15 +8,14 @@ AppleのVisionフレームワークを使用して、画像からテキストを
 
 - macOS（AppleのVisionフレームワークを使用するため）
 - Python 3.6以上
-- Anaconda（仮想環境管理用）
 
 ## インストール
 
-1. Anaconda環境を作成し、アクティベートします：
+1. Python標準の仮想環境（.venv）を作成し、アクティベートします：
 
 ```bash
-conda create -n apple-ocr python=3.9
-conda activate apple-ocr
+python3 -m venv .venv
+source .venv/bin/activate  # macOSの場合
 ```
 
 2. 必要なパッケージをインストールします：
@@ -24,6 +23,8 @@ conda activate apple-ocr
 ```bash
 pip install -r requirements.txt
 ```
+
+注：以前はAnaconda環境を使用していましたが、より多くのユーザーが簡単に使えるようにPython標準の仮想環境（venv）に移行しました。
 
 ## 使用方法
 
